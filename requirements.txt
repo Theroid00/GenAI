@@ -1,0 +1,8 @@
+pandas>=1.0.0
+numpy>=1.18.0
+matplotlib>=3.1.0
+faker>=4.0.0
+tqdm>=4.46.0
+# Optional dependency for model-based generation
+# Uncomment the line below to enable model-based generation (Mode 1)
+# sdv>=1.0.0
