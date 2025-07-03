@@ -1,0 +1,89 @@
+[
+  {
+    "name": "transaction_id",
+    "type": "uuid"
+  },
+  {
+    "name": "customer_id",
+    "type": "uuid"
+  },
+  {
+    "name": "product_id",
+    "type": "uuid"
+  },
+  {
+    "name": "category",
+    "type": "category",
+    "categories": ["Electronics", "Clothing", "Home & Kitchen", "Books", "Toys", "Sports", "Beauty"]
+  },
+  {
+    "name": "product_name",
+    "type": "category",
+    "categories": [
+      "Premium 4K Smart TV", "Bluetooth Wireless Headphones", "Smartphone Pro Max", "Laptop Ultra Slim", "Tablet Air Plus",
+      "Designer Jeans", "Cotton T-Shirt Pack", "Leather Jacket", "Running Shoes", "Winter Coat Collection",
+      "Non-Stick Cookware Set", "Coffee Maker Deluxe", "Memory Foam Mattress", "Kitchen Knife Set", "Robot Vacuum Cleaner",
+      "Bestselling Novel", "Children's Illustrated Series", "Self-Help Guide", "Historical Biography", "Cooking Encyclopedia",
+      "Building Blocks Set", "Remote Control Car", "Interactive Plush Animal", "Educational Board Game", "Art and Craft Kit",
+      "Tennis Racket Pro", "Yoga Mat Premium", "Mountain Bike", "Fitness Tracker Watch", "Camping Tent 4-Person",
+      "Facial Cleanser", "Anti-Aging Serum", "Makeup Palette", "Perfume Collection", "Hair Care Set"
+    ],
+    "relationships": [
+      {
+        "target_column": "category",
+        "type": "dependency",
+        "mapping": {
+          "Electronics": ["Premium 4K Smart TV", "Bluetooth Wireless Headphones", "Smartphone Pro Max", "Laptop Ultra Slim", "Tablet Air Plus"],
+          "Clothing": ["Designer Jeans", "Cotton T-Shirt Pack", "Leather Jacket", "Running Shoes", "Winter Coat Collection"],
+          "Home & Kitchen": ["Non-Stick Cookware Set", "Coffee Maker Deluxe", "Memory Foam Mattress", "Kitchen Knife Set", "Robot Vacuum Cleaner"],
+          "Books": ["Bestselling Novel", "Children's Illustrated Series", "Self-Help Guide", "Historical Biography", "Cooking Encyclopedia"],
+          "Toys": ["Building Blocks Set", "Remote Control Car", "Interactive Plush Animal", "Educational Board Game", "Art and Craft Kit"],
+          "Sports": ["Tennis Racket Pro", "Yoga Mat Premium", "Mountain Bike", "Fitness Tracker Watch", "Camping Tent 4-Person"],
+          "Beauty": ["Facial Cleanser", "Anti-Aging Serum", "Makeup Palette", "Perfume Collection", "Hair Care Set"]
+        }
+      }
+    ]
+  },
+  {
+    "name": "transaction_date",
+    "type": "string",
+    "subtype": "date"
+  },
+  {
+    "name": "quantity",
+    "type": "int",
+    "min": 1,
+    "max": 10,
+    "distribution": "normal",
+    "mean": 2,
+    "std": 1
+  },
+  {
+    "name": "unit_price",
+    "type": "float",
+    "min": 5.99,
+    "max": 999.99,
+    "distribution": "normal",
+    "mean": 79.99,
+    "std": 150,
+    "decimals": 2
+  },
+  {
+    "name": "total_amount",
+    "type": "float",
+    "min": 5.99,
+    "max": 9999.99,
+    "decimals": 2
+  },
+  {
+    "name": "payment_method",
+    "type": "category",
+    "categories": ["Credit Card", "Debit Card", "PayPal", "Bank Transfer", "Cash"],
+    "weights": [0.4, 0.3, 0.15, 0.1, 0.05]
+  },
+  {
+    "name": "store_location",
+    "type": "string",
+    "subtype": "city"
+  }
+]

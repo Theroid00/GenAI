@@ -1,0 +1,73 @@
+[
+  {
+    "name": "student_id",
+    "type": "uuid"
+  },
+  {
+    "name": "first_name",
+    "type": "string",
+    "subtype": "first_name"
+  },
+  {
+    "name": "last_name",
+    "type": "string",
+    "subtype": "last_name"
+  },
+  {
+    "name": "full_name",
+    "type": "string",
+    "subtype": "full_name"
+  },
+  {
+    "name": "email",
+    "type": "string",
+    "subtype": "email"
+  },
+  {
+    "name": "age",
+    "type": "int",
+    "min": 18,
+    "max": 30,
+    "distribution": "normal",
+    "mean": 21,
+    "std": 3
+  },
+  {
+    "name": "gender",
+    "type": "category",
+    "categories": ["Male", "Female", "Non-binary", "Prefer not to say"],
+    "weights": [0.48, 0.48, 0.03, 0.01]
+  },
+  {
+    "name": "major",
+    "type": "category",
+    "categories": ["Computer Science", "Business", "Engineering", "Biology", "Psychology", "Mathematics", "Physics", "Chemistry", "English", "History"]
+  },
+  {
+    "name": "gpa",
+    "type": "float",
+    "min": 2.0,
+    "max": 4.0,
+    "distribution": "normal",
+    "mean": 3.2,
+    "std": 0.5,
+    "decimals": 2
+  },
+  {
+    "name": "enrollment_date",
+    "type": "string",
+    "subtype": "date"
+  },
+  {
+    "name": "graduation_year",
+    "type": "int",
+    "min": 2023,
+    "max": 2028
+  },
+  {
+    "name": "is_international",
+    "type": "category",
+    "categories": ["Yes", "No"],
+    "weights": [0.15, 0.85]
+  }
+]

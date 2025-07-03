@@ -6,10 +6,21 @@ This module contains functions for schema inference, definition, and manipulatio
 import numpy as np
 import pandas as pd
 import logging
-from typing import Dict, Any, List, Tuple, Union
+from typing import Dict, Any, List, Tuple, Union, Optional
 from faker import Faker
 import json
-from datetime import datetime
+import random
+import uuid
+from datetime import datetime, timedelta
+
+# Import region manager for region-specific data generation
+try:
+    from synthetic_data_gen.providers import region_manager
+    REGION_MANAGER_AVAILABLE = True
+except ImportError:
+    REGION_MANAGER_AVAILABLE = False
+    logger = logging.getLogger('synthetic_data_generator')
+    logger.warning("Region manager not available. Some region-specific features may be limited.")
 
 # Initialize faker
 fake = Faker()
@@ -381,3 +392,232 @@ def save_schema_to_json(schema: List[Dict[str, Any]], file_path: str) -> None:
     except Exception as e:
         logger.error(f"Error saving schema: {str(e)}")
         print(f"Error saving schema: {str(e)}")
+
+def generate_field_data(field_name: str, field_type: str, constraints: Dict[str, Any], 
+                      num_samples: int) -> List[Any]:
+    """
+    Generate data for a field based on its type and constraints.
+    
+    Args:
+        field_name (str): Name of the field
+        field_type (str): Type of the field (int, float, string, category, date, uuid)
+        constraints (Dict[str, Any]): Constraints for data generation
+        num_samples (int): Number of samples to generate
+        
+    Returns:
+        List[Any]: Generated data for the field
+    """
+    # Extract region and domain information if available
+    region = constraints.get('region')
+    domain = constraints.get('domain')
+    
+    # For numeric types (int, float)
+    if field_type in ['int', 'float']:
+        return generate_numeric_data(field_type, constraints, num_samples)
+    
+    # For string types
+    elif field_type == 'string':
+        return generate_string_data(field_name, constraints, num_samples, region, domain)
+    
+    # For categorical types
+    elif field_type == 'category':
+        return generate_categorical_data(constraints, num_samples)
+    
+    # For date types
+    elif field_type == 'date':
+        return generate_date_data(constraints, num_samples)
+    
+    # For UUID types
+    elif field_type == 'uuid':
+        return [str(uuid.uuid4()) for _ in range(num_samples)]
+    
+    # For other types
+    else:
+        logger.warning(f"Unsupported field type: {field_type}. Using string fallback.")
+        return [f"Unsupported type: {field_type}" for _ in range(num_samples)]
+
+def generate_numeric_data(field_type: str, constraints: Dict[str, Any], num_samples: int) -> List[Union[int, float]]:
+    """
+    Generate numeric data based on constraints.
+    
+    Args:
+        field_type (str): 'int' or 'float'
+        constraints (Dict[str, Any]): Constraints for data generation
+        num_samples (int): Number of samples to generate
+        
+    Returns:
+        List[Union[int, float]]: Generated numeric data
+    """
+    # Extract constraints
+    min_val = constraints.get('min', 0)
+    max_val = constraints.get('max', 100)
+    distribution = constraints.get('distribution', 'uniform')
+    
+    if distribution == 'normal':
+        # For normal distribution
+        mean = constraints.get('mean', (min_val + max_val) / 2)
+        std = constraints.get('std', (max_val - min_val) / 6)
+        
+        # Generate values
+        values = np.random.normal(mean, std, num_samples)
+        
+        # Apply bounds
+        values = np.clip(values, min_val, max_val)
+    else:
+        # For uniform distribution
+        if field_type == 'int':
+            values = np.random.randint(min_val, max_val + 1, num_samples)
+        else:
+            values = np.random.uniform(min_val, max_val, num_samples)
+    
+    # Apply rounding for float
+    if field_type == 'float':
+        decimals = constraints.get('decimals', 2)
+        values = np.round(values, decimals)
+    else:
+        values = values.astype(int)
+    
+    return values.tolist()
+
+def generate_string_data(field_name: str, constraints: Dict[str, Any], num_samples: int, 
+                      region: Optional[str] = None, domain: Optional[str] = None) -> List[str]:
+    """
+    Generate string data based on constraints, with region-specific customization.
+    
+    Args:
+        field_name (str): Name of the field
+        constraints (Dict[str, Any]): Constraints for data generation
+        num_samples (int): Number of samples to generate
+        region (Optional[str]): Region code for region-specific data (e.g., 'india', 'usa')
+        domain (Optional[str]): Domain code for domain-specific data (e.g., 'healthcare')
+        
+    Returns:
+        List[str]: Generated string data
+    """
+    subtype = constraints.get('subtype', 'text')
+    
+    # Check if we should use region-specific data
+    if region and REGION_MANAGER_AVAILABLE:
+        # Try to use region-specific data provider
+        # First, determine the data type based on field name and subtype
+        data_type = subtype
+        
+        # If subtype is generic, try to infer data type from field name
+        if subtype == 'generic':
+            field_lower = field_name.lower()
+            if 'name' in field_lower:
+                data_type = 'name'
+            elif 'city' in field_lower:
+                data_type = 'city'
+            elif 'address' in field_lower:
+                data_type = 'address'
+            elif 'phone' in field_lower:
+                data_type = 'phone_number'
+            elif 'email' in field_lower:
+                data_type = 'email'
+            elif 'company' in field_lower:
+                data_type = 'company'
+            elif 'job' in field_lower or 'occupation' in field_lower:
+                data_type = 'job'
+        
+        # Try to use the region-specific generator
+        try:
+            return [region_manager.region_manager.generate_data(region, data_type) for _ in range(num_samples)]
+        except Exception as e:
+            logger.warning(f"Failed to use region-specific data for {data_type} in {region}: {str(e)}")
+            # Fall back to generic generation
+    
+    # Check for domain-specific data
+    if domain and REGION_MANAGER_AVAILABLE:
+        # Try to use domain-specific data provider
+        try:
+            return [region_manager.region_manager.generate_data(domain, subtype) for _ in range(num_samples)]
+        except Exception as e:
+            logger.warning(f"Failed to use domain-specific data for {subtype} in {domain}: {str(e)}")
+            # Fall back to generic generation
+    
+    # Generic Faker-based generation
+    if subtype == 'name':
+        return [fake.name() for _ in range(num_samples)]
+    elif subtype == 'first_name':
+        return [fake.first_name() for _ in range(num_samples)]
+    elif subtype == 'last_name':
+        return [fake.last_name() for _ in range(num_samples)]
+    elif subtype == 'full_name':
+        return [fake.name() for _ in range(num_samples)]
+    elif subtype == 'city':
+        return [fake.city() for _ in range(num_samples)]
+    elif subtype == 'country':
+        return [fake.country() for _ in range(num_samples)]
+    elif subtype == 'email':
+        return [fake.email() for _ in range(num_samples)]
+    elif subtype == 'phone':
+        return [fake.phone_number() for _ in range(num_samples)]
+    elif subtype == 'address':
+        return [fake.address().replace('\n', ', ') for _ in range(num_samples)]
+    elif subtype == 'company':
+        return [fake.company() for _ in range(num_samples)]
+    elif subtype == 'job':
+        return [fake.job() for _ in range(num_samples)]
+    elif subtype == 'text':
+        return [fake.text(max_nb_chars=100) for _ in range(num_samples)]
+    elif subtype == 'custom':
+        pattern = constraints.get('pattern', '')
+        
+        if pattern:
+            # Use pattern with Faker if possible
+            return [fake.bothify(pattern) for _ in range(num_samples)]
+        else:
+            min_length = constraints.get('min_length', 5)
+            max_length = constraints.get('max_length', 20)
+            
+            return [
+                ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', 
+                                      k=random.randint(min_length, max_length)))
+                for _ in range(num_samples)
+            ]
+    else:
+        return [fake.text(max_nb_chars=50) for _ in range(num_samples)]
+
+def generate_categorical_data(constraints: Dict[str, Any], num_samples: int) -> List[Any]:
+    """
+    Generate categorical data based on constraints.
+    
+    Args:
+        constraints (Dict[str, Any]): Constraints for data generation
+        num_samples (int): Number of samples to generate
+        
+    Returns:
+        List[Any]: Generated categorical data
+    """
+    categories = constraints.get('categories', ['Category A', 'Category B', 'Category C'])
+    weights = constraints.get('weights')
+    
+    if weights and len(weights) == len(categories):
+        return np.random.choice(categories, num_samples, p=weights).tolist()
+    else:
+        return np.random.choice(categories, num_samples).tolist()
+
+def generate_date_data(constraints: Dict[str, Any], num_samples: int) -> List[datetime]:
+    """
+    Generate date data based on constraints.
+    
+    Args:
+        constraints (Dict[str, Any]): Constraints for data generation
+        num_samples (int): Number of samples to generate
+        
+    Returns:
+        List[datetime]: Generated date data
+    """
+    # Extract constraints
+    start_date = constraints.get('start_date', datetime(2020, 1, 1))
+    end_date = constraints.get('end_date', datetime(2023, 12, 31))
+    
+    # Calculate the range in days
+    date_range = (end_date - start_date).days
+    
+    # Generate random dates
+    random_days = np.random.randint(0, date_range + 1, num_samples)
+    dates = [start_date + timedelta(days=int(days)) for days in random_days]
+    
+    return dates

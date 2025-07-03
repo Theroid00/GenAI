@@ -1,0 +1,61 @@
+[
+  {
+    "name": "employee_id",
+    "type": "uuid"
+  },
+  {
+    "name": "first_name",
+    "type": "string",
+    "subtype": "first_name"
+  },
+  {
+    "name": "last_name",
+    "type": "string",
+    "subtype": "last_name"
+  },
+  {
+    "name": "full_name",
+    "type": "string",
+    "subtype": "full_name"
+  },
+  {
+    "name": "email",
+    "type": "string",
+    "subtype": "email"
+  },
+  {
+    "name": "department",
+    "type": "category",
+    "categories": ["Engineering", "Marketing", "Sales", "HR", "Finance", "Operations", "Legal"]
+  },
+  {
+    "name": "job_title",
+    "type": "category",
+    "categories": ["Manager", "Director", "Associate", "Specialist", "Analyst", "Developer", "Designer"]
+  },
+  {
+    "name": "salary",
+    "type": "float",
+    "min": 35000,
+    "max": 150000,
+    "distribution": "normal",
+    "mean": 75000,
+    "std": 20000,
+    "decimals": 2
+  },
+  {
+    "name": "hire_date",
+    "type": "string",
+    "subtype": "date"
+  },
+  {
+    "name": "manager_id",
+    "type": "string"
+  },
+  {
+    "name": "is_remote",
+    "type": "category",
+    "categories": ["Yes", "No", "Hybrid"],
+    "weights": [0.3, 0.4, 0.3]
+  }
+]

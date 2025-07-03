@@ -16,7 +16,9 @@ from synthetic_data_gen.modes import (
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='synthetic_data_generator.log'
+    handlers=[
+        logging.StreamHandler()  # Log to console instead of file by default
+    ]
 )
 logger = logging.getLogger('synthetic_data_generator')
 
