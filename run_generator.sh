@@ -37,8 +37,8 @@ echo ""
 echo "Starting Synthetic Data Generator..."
 echo ""
 
-# Run the generator
-python synthetic_data_generator.py
+# Run the launcher
+python launcher.py
 
 # Deactivate virtual environment
 deactivate

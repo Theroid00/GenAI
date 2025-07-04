@@ -12,12 +12,34 @@ import os
 import sys
 import argparse
 import json
+import logging
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 import pandas as pd
+from pathlib import Path
 
-# Import from the project
-from integrated_generator import generate_and_validate
-from synthetic_data_generator import load_schema_from_json
+# Import from the modular synthetic_data_gen package
+from synthetic_data_gen import (
+    SyntheticDataGenerator,
+    infer_schema,
+    load_schema_from_json,
+    save_schema_to_json,
+    load_csv,
+    save_to_csv,
+    check_dependencies,
+    SDV_AVAILABLE,
+    __version__
+)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger('synthetic_data_cli')
 
 def list_templates() -> List[str]:
     """
@@ -196,10 +218,61 @@ def create_new_template(template_name: str, interactive: bool = True) -> None:
     except Exception as e:
         print(f"Error creating template: {str(e)}")
 
+def generate_and_process(
+    input_path: str = None, 
+    schema_path: str = None,
+    output_path: str = None,
+    num_rows: int = 100,
+    model_type: str = 'gaussian'
+) -> pd.DataFrame:
+    """
+    Generate synthetic data using the modular SyntheticDataGenerator.
+    
+    Args:
+        input_path: Path to input CSV (optional)
+        schema_path: Path to schema JSON (optional)
+        output_path: Path to save the output CSV
+        num_rows: Number of rows to generate
+        model_type: Model type for model-based generation
+        
+    Returns:
+        DataFrame with synthetic data
+    """
+    # Create generator instance
+    generator = SyntheticDataGenerator()
+    
+    # Determine generation mode
+    if input_path and os.path.exists(input_path):
+        # Generate from CSV sample
+        logger.info(f"Generating {num_rows} rows from CSV sample: {input_path}")
+        df = generator.generate_from_csv(
+            csv_path=input_path,
+            num_rows=num_rows,
+            model_type=model_type,
+            output_path=output_path
+        )
+    elif schema_path and os.path.exists(schema_path):
+        # Generate from schema file
+        logger.info(f"Generating {num_rows} rows from schema: {schema_path}")
+        
+        # Load schema
+        schema = load_schema_from_json(schema_path)
+        
+        # Generate data
+        df = generator.generate_from_schema(
+            schema=schema,
+            num_rows=num_rows,
+            output_path=output_path
+        )
+    else:
+        raise ValueError("Either input_path or schema_path must be provided")
+    
+    return df
+
 def main():
     """Main function with comprehensive argument parsing"""
     parser = argparse.ArgumentParser(
-        description="Synthetic Data Generator CLI",
+        description=f"Synthetic Data Generator CLI v{__version__}",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -269,10 +342,6 @@ Available templates:
         "--rows", "-r", type=int, default=100,
         help="Number of rows to generate"
     )
-    output_group.add_argument(
-        "--no-validate", action="store_true",
-        help="Skip validation step"
-    )
     
     # Advanced options
     advanced_group = parser.add_argument_group("Advanced Options")
@@ -281,11 +350,23 @@ Available templates:
         help="Model type for sample-based generation"
     )
     advanced_group.add_argument(
-        "--verbose", "-v", action="store_true",
-        help="Enable verbose output"
+        "--visualize", "-v", action="store_true",
+        help="Visualize data distributions"
+    )
+    advanced_group.add_argument(
+        "--check-deps", "-c", action="store_true",
+        help="Check dependencies and exit"
     )
     
     args = parser.parse_args()
+    
+    # Check dependencies if requested
+    if args.check_deps:
+        all_deps_met, message = check_dependencies()
+        print("\nDependency Check:")
+        print("================")
+        print(message)
+        sys.exit(0 if all_deps_met else 1)
     
     # Template management options
     if args.list_templates:
@@ -338,32 +419,42 @@ Available templates:
     
     # Run the generator
     try:
-        if args.verbose:
-            print(f"\nSynthetic Data Generator")
-            print(f"=======================")
-            
-            if input_path:
-                print(f"Mode: Generate from CSV sample")
-                print(f"Input: {input_path}")
-            elif schema_path:
-                print(f"Mode: Generate from {'template' if args.template else 'schema'}")
-                print(f"Schema: {schema_path}")
-            
-            print(f"Rows: {args.rows}")
-            print(f"Output: {args.output}")
-            print(f"Validation: {'Disabled' if args.no_validate else 'Enabled'}")
-            if input_path:
-                print(f"Model: {args.model}")
-            print()
+        # Print information about the generation
+        print(f"\nSynthetic Data Generator v{__version__}")
+        print(f"================================{"=" * len(__version__)}")
         
-        df = generate_and_validate(
+        if input_path:
+            print(f"Mode: Generate from CSV sample")
+            print(f"Input: {input_path}")
+            
+            # Check if SDV is available for model-based generation
+            if not SDV_AVAILABLE:
+                print("\nWarning: SDV package is not installed. It's required for model-based generation.")
+                print("Install with: pip install sdv")
+                sys.exit(1)
+                
+            print(f"Model: {args.model}")
+        elif schema_path:
+            print(f"Mode: Generate from {'template' if args.template else 'schema'}")
+            print(f"Schema: {schema_path}")
+        
+        print(f"Rows: {args.rows}")
+        print(f"Output: {args.output}")
+        
+        # Generate synthetic data
+        df = generate_and_process(
             input_path=input_path,
             schema_path=schema_path,
             output_path=args.output,
             num_rows=args.rows,
-            model_type=args.model,
-            validate=not args.no_validate
+            model_type=args.model
         )
+        
+        # Visualize if requested
+        if args.visualize:
+            from synthetic_data_gen.validation import visualize_data_distributions
+            print("\nVisualizing data distributions...")
+            visualize_data_distributions(df)
         
         print(f"\nSuccessfully generated {len(df)} rows of synthetic data!")
         print(f"Output saved to: {os.path.abspath(args.output)}")
@@ -376,9 +467,7 @@ Available templates:
         
     except Exception as e:
         print(f"Error: {str(e)}")
-        if args.verbose:
-            import traceback
-            traceback.print_exc()
+        logging.error(f"Error generating synthetic data: {str(e)}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":

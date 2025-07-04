@@ -1,0 +1,48 @@
+[
+  {
+    "name": "customer_id",
+    "type": "uuid"
+  },
+  {
+    "name": "full_name",
+    "type": "string",
+    "subtype": "full_name"
+  },
+  {
+    "name": "email",
+    "type": "string",
+    "subtype": "email"
+  },
+  {
+    "name": "phone",
+    "type": "string",
+    "subtype": "phone"
+  },
+  {
+    "name": "age",
+    "type": "int",
+    "min": 18,
+    "max": 85,
+    "distribution": "normal",
+    "mean": 42,
+    "std": 12
+  },
+  {
+    "name": "membership_level",
+    "type": "category",
+    "categories": ["Silver", "Gold", "Platinum", "Diamond"],
+    "weights": [0.5, 0.3, 0.15, 0.05]
+  },
+  {
+    "name": "subscription_fee",
+    "type": "float",
+    "min": 9.99,
+    "max": 199.99,
+    "decimals": 2
+  },
+  {
+    "name": "join_date",
+    "type": "string",
+    "subtype": "date"
+  }
+]

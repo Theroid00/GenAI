@@ -10,10 +10,9 @@ generating standardized field formats.
 
 import json
 import pandas as pd
-from synthetic_data_generator import (
+from synthetic_data_gen import (
+    SyntheticDataGenerator,
     load_schema_from_json,
-    generate_synthetic_data_from_schema,
-    post_process_synthetic_data,
     save_to_csv
 )
 
@@ -34,19 +33,16 @@ def main():
     num_rows = 100
     print(f"Generating {num_rows} rows with {len(schema)} columns...")
     
-    synthetic_df = generate_synthetic_data_from_schema(schema, num_rows)
-    
-    # Apply post-processing
-    print("Applying post-processing to make data more realistic...")
-    processed_df = post_process_synthetic_data(pd.DataFrame(), synthetic_df)
+    generator = SyntheticDataGenerator()
+    df = generator.generate_from_schema(schema, num_rows)
     
     # Display sample rows
     print("\nSample data (first 5 rows):")
-    print(processed_df.head())
+    print(df.head())
     
     # Save to CSV
     output_path = "test_schema_output.csv"
-    save_to_csv(processed_df, output_path)
+    save_to_csv(df, output_path)
     print(f"\nTest data saved to {output_path}")
 
 if __name__ == "__main__":

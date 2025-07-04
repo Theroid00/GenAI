@@ -1,241 +1,203 @@
 # Synthetic Data Generator
 
-A comprehensive tool for generating high-quality synthetic data with built-in validation and customizable templates.
+A versatile Python tool for generating synthetic data with multiple operational modes.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python Version](https://img.shields.io/badge/python-3.6%2B-blue)](https://www.python.org/downloads/)
 
 ## Features
 
-- **Multiple Generation Modes**:
-  - Generate from CSV sample (model-based approach)
-  - Generate from JSON schema definitions
-  - Generate interactively through prompts
-  - Use built-in templates for common data structures
-- **Automatic Validation**: Detect and fix data quality issues
-- **Standardized Field Formats**: Generate realistic IDs, emails, phone numbers, and more
-- **Rich Data Types**: Support for various data types and distributions
-- **Relationship Modeling**: Create dependencies between columns
-- **Field Parsing**: Ensure logical consistency between related fields
+- **Mode 1: Generate from CSV sample** - Use a sample CSV file to train a model and generate similar synthetic data
+- **Mode 2: Generate from scratch** - Interactively define a schema and generate data based on that schema
+- **Mode 3: Generate from saved schema** - Load a previously saved schema and generate data
 
-## Quick Start
+## Installation
 
-### Installation
+### Quick Setup (Recommended)
 
-No installation required, just clone the repository and ensure you have the required dependencies:
+The easiest way to get started is to use the provided setup script, which creates a virtual environment and installs all dependencies:
 
 ```bash
-# Install all required dependencies
-pip install -r requirements.txt
+# Clone the repository
+git clone https://github.com/theroid/synthetic-data-generator.git
+cd synthetic-data-generator
 
-# Or install core dependencies manually
-pip install pandas numpy faker tqdm matplotlib
-# Optional for model-based generation
+# Make the setup script executable (Linux/Mac)
+chmod +x setup_env.py
+
+# Run the setup script
+./setup_env.py  # On Linux/Mac if executable
+# OR
+python setup_env.py  # On any platform
+
+# Activate the virtual environment
+# On Linux/Mac:
+source .venv/bin/activate
+# On Windows:
+.venv\Scripts\activate
+```
+
+### Manual Installation
+
+Alternatively, you can set up the environment manually:
+
+1. Create a virtual environment:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Linux/Mac
+   .venv\Scripts\activate     # On Windows
+   ```
+
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Install the package in development mode:
+   ```bash
+   pip install -e .
+   ```
+
+### With Model-Based Generation Support
+
+For model-based generation (Mode 1), you'll need to install the SDV package:
+
+```bash
 pip install sdv
 ```
 
-### Running the Generator
+## Usage
 
-You can use the launcher script for an interactive experience:
-
-```bash
-# Start the launcher interface
-python launcher.py
-
-# Or use the shell script
-./run_generator.sh
-```
-
-### Usage
-
-The easiest way to generate data is using the comprehensive CLI interface:
+After installation, you can run the generator using the following command:
 
 ```bash
-# Generate data using a built-in template
-python synthetic_data_cli.py --template customer_template --rows 100 --output customer_data.csv
+# If installed with setup_env.py or manually
+python run_generator.py
 
-# Generate data from a schema file
-python synthetic_data_cli.py --schema my_schema.json --rows 500 --output my_data.csv
-
-# Generate data from a sample CSV file
-python synthetic_data_cli.py --sample sample_data.csv --rows 1000 --output synthetic_data.csv
+# OR (if the script is executable on Linux/Mac)
+./run_generator.py
 ```
 
-### Managing Templates
+### Operational Modes
 
-```bash
-# List all available templates
-python synthetic_data_cli.py --list-templates
+1. **Mode 1: Generate from CSV Sample**
+   - Provide a sample CSV file
+   - The generator will analyze it and create similar synthetic data
+   - Model-based generation using the SDV package (if installed)
 
-# Show details about a specific template
-python synthetic_data_cli.py --template-info customer_template
+2. **Mode 2: Generate Interactively**
+   - Define your data schema through interactive prompts
+   - Specify column types, distributions, and relationships
+   - Generate data based on your specifications
 
-# Create a new template interactively
-python synthetic_data_cli.py --create-template my_template
-```
+3. **Mode 3: Generate from Saved Schema**
+   - Load a previously saved schema file
+   - Generate data according to the pre-defined schema
 
-The dedicated template creator provides a more guided experience:
+### Programmatic API
 
-```bash
-# Create a template interactively
-python create_template.py --name my_template
-
-# Create a template based on an example
-python create_template.py --name retail_template --example sales
-```
-
-Available templates:
-- `customer_template` - Customer profiles with demographic information
-- `employee_template` - Employee records with department and salary information
-- `sales_template` - Sales transaction data with products and prices
-- `student_template` - Student records with academic information
-
-## Data Validation
-
-The integrated validation system automatically fixes various data quality issues:
-
-- ID format inconsistencies
-- Name capitalization issues
-- Email consistency with names
-- Phone number formatting
-- Numeric value range enforcement
-- Geographic consistency
-- Uniqueness constraints
-
-## Field Parsing
-
-The field parser ensures logical consistency between related fields that might not be fully captured by template relationships:
-
-- **Product-Category Matching**: Ensures products belong to the appropriate categories
-- **Case Normalization**: Standardizes text formatting for consistent display
-- **Custom Parsing Rules**: Extensible system for adding domain-specific rules
-
-See `FIELD_PARSER.md` for more details on how to extend the field parser with custom rules.
-
-## Creating Custom Schemas
-
-Create a JSON file with an array of column definitions:
-
-```json
-[
-  {
-    "name": "customer_id",
-    "type": "uuid"
-  },
-  {
-    "name": "full_name",
-    "type": "string",
-    "subtype": "full_name"
-  },
-  {
-    "name": "age",
-    "type": "int",
-    "min": 18,
-    "max": 85,
-    "distribution": "normal",
-    "mean": 42,
-    "std": 12
-  }
-]
-```
-
-See the `templates` directory for more examples.
-
-## Field Types and Properties
-
-| Type | Required Properties | Optional Properties |
-|------|---------------------|---------------------|
-| `int` | `name`, `min`, `max` | `distribution`, `mean`, `std` |
-| `float` | `name`, `min`, `max` | `distribution`, `mean`, `std`, `decimals` |
-| `string` | `name` | `subtype`, `pattern`, `min_length`, `max_length` |
-| `category` | `name`, `categories` | `weights` |
-| `date` | `name` | `start_date`, `end_date` |
-| `uuid` | `name` | - |
-
-## Programmatic API
-
-You can also use the generator from your Python code:
+You can also use the generator from your own Python code:
 
 ```python
-from integrated_generator import generate_and_validate
+from synthetic_data_gen import SyntheticDataGenerator
 
-# Generate data from a schema file
-df = generate_and_validate(
-    schema_path="my_schema.json",
-    num_rows=500,
-    output_path="output.csv"
-)
+# Create a generator instance
+generator = SyntheticDataGenerator()
 
-# Generate data from a CSV sample
-df = generate_and_validate(
-    input_path="sample.csv",
-    num_rows=1000,
-    model_type="gaussian",
-    output_path="synthetic.csv"
-)
+# Generate from CSV
+synthetic_data = generator.generate_from_csv('sample.csv', num_rows=100)
+
+# Save to CSV
+synthetic_data.to_csv('synthetic_output.csv', index=False)
 ```
 
-## Generation Modes
+## Documentation
 
-### Interactive Mode
+For more detailed information about the project structure and implementation, refer to:
 
-This mode allows you to create datasets from scratch through an interactive command-line interface:
-1. Launch the tool with `python launcher.py` and select option 6
-2. Follow the prompts to define fields, types, and constraints
-3. Generate and save your custom dataset
+- `MODULARIZATION.md` - Details about the project's module structure
+- `CHANGELOG.md` - History of changes and version information
 
-### Model-based Generation
+## Contributing
 
-This mode uses an existing CSV dataset to learn patterns and generate similar synthetic data. It:
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Usage
+
+### Command-Line Interface
+
+```bash
+# Run the generator with the interactive interface
+python run_generator.py
+
+# Or use the console script
+synthetic-data
+```
+
+### Python API
+
+```python
+from synthetic_data_gen import SyntheticDataGenerator
+
+# Create a generator instance
+generator = SyntheticDataGenerator()
+
+# Mode 1: Generate from CSV
+df = generator.generate_from_csv(
+    csv_path="sample_data.csv",
+    num_rows=1000,
+    model_type='gaussian'
+)
+
+# Mode 2: Interactive schema definition
+generator.interactive_mode()
+
+# Mode 3: Generate from saved schema
+from synthetic_data_gen import load_schema_from_json
+schema = load_schema_from_json("schema.json")
+df = generator.generate_from_schema(schema, num_rows=500)
+
+# Visualization
+generator.visualize_data(num_cols=3)
+```
+
+## Operational Modes
+
+### Mode 1: Generate from CSV Sample
+
+This mode uses a model-based approach to learn the patterns in an existing CSV dataset and generate similar synthetic data. It requires the optional SDV package:
+
+```bash
+pip install sdv
+```
+
+This mode:
 1. Loads a sample CSV file
 2. Infers the schema and data distributions
 3. Trains a model (Gaussian Copula or CTGAN)
 4. Generates synthetic data that preserves the statistical properties of the original
-5. Post-processes and validates the data to ensure quality
 
-### Schema-based Generation
+### Mode 2: Generate from Scratch
 
-This mode uses a JSON schema to define the structure and properties of the data to generate. It:
-1. Loads a schema definition
-2. Generates data according to the specified types and constraints
-3. Applies relationships between fields if defined
-4. Validates and fixes any quality issues
+This mode allows you to interactively define a schema from scratch:
 
-### Template-based Generation
+1. Define columns, their data types, and constraints
+2. Set up relationships between columns (correlations, dependencies, transformations)
+3. Generate synthetic data based on the defined schema
 
-This mode uses pre-defined templates for common data structures:
-1. Select a template (customer, employee, sales, student)
-2. Customize parameters like row count and output file
-3. Generate data with consistent structure and realistic values
+### Mode 3: Generate from Saved Schema
 
-## Project Structure
-
-- `launcher.py` - Main entry point with interactive menu
-- `synthetic_data_cli.py` - Comprehensive command-line interface
-- `create_template.py` - Interactive template creation tool
-- `quick_generate.py` - Simplified command-line interface
-- `integrated_generator.py` - Combined generator with validation
-- `synthetic_data_generator.py` - Core generator functionality
-- `interactive_mode.py` - Direct launcher for interactive data generation
-- `field_standards.py` - Standards for field formatting
-- `field_parser.py` - Logical consistency between related fields
-- `run_generator.sh` - Shell script to run the generator
-- `synthetic_data_gen/` - Package with modular components
-- `experimental/validation/` - Validation module
-- `templates/` - Pre-defined templates
-- `tests/` - Test files and test data
+This mode loads a previously saved schema definition from a JSON file and generates data accordingly. This is useful for repeatable data generation with consistent properties.
 
 ## Dependencies
 
 - Required: pandas, numpy, matplotlib, faker, tqdm
 - Optional: sdv (for model-based generation)
 
-## Documentation
-
-For more detailed information about the project structure and implementation, refer to:
-
-- `CHANGELOG.md` - History of changes and version information
-- `FIELD_STANDARDS.md` - Documentation of standardized field formats for realistic data
-- `FIELD_PARSER.md` - Documentation of field parsing rules for logical consistency
-- `experimental/validation/README.md` - Documentation for the validation module
-
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT

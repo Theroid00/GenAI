@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
-Integrated Synthetic Data Generator with Validation
+Integrated Synthetic Data Generator
 --------------------------------------------------
-This script combines the synthetic data generator with the data validation module
-to produce high-quality, validated synthetic data.
+This script provides a simple interface to generate synthetic data
+using different modes and applying field parsing.
 """
 
 import os
@@ -14,6 +14,8 @@ import argparse
 import json
 import pandas as pd
 from typing import Dict, Any, List, Tuple
+import random
+from faker import Faker
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -28,9 +30,6 @@ from synthetic_data_generator import (
     infer_schema
 )
 
-# Import from validation module
-from experimental.validation.data_validator import validate_and_fix_data
-
 # Import field parser for special field handling
 try:
     from field_parser import apply_field_parsing
@@ -38,16 +37,74 @@ try:
 except ImportError:
     FIELD_PARSER_AVAILABLE = False
 
-def generate_and_validate(
+def generate_diverse_names(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Generate diverse names for name columns with high repetition.
+    
+    Args:
+        df: DataFrame with potentially repetitive names
+        
+    Returns:
+        DataFrame with more diverse names
+    """
+    result_df = df.copy()
+    
+    # Check for name columns with high repetition
+    for col in df.columns:
+        col_lower = col.lower()
+        if 'name' in col_lower and 'id' not in col_lower:
+            unique_names_count = df[col].nunique()
+            total_rows = len(df)
+            
+            # If there's high repetition (less than 10% unique values), replace with more diverse names
+            if unique_names_count < total_rows * 0.1 and total_rows > 100:
+                print(f"Detected high name repetition in column {col}. Generating more diverse names...")
+                
+                # Create a Faker instance with different locales
+                fake_multi = Faker(['en_US', 'en_GB', 'en_CA', 'en_AU'])
+                
+                # Generate diverse names based on context
+                if 'first' in col_lower:
+                    result_df[col] = [fake_multi.first_name() for _ in range(total_rows)]
+                elif 'last' in col_lower:
+                    result_df[col] = [fake_multi.last_name() for _ in range(total_rows)]
+                else:
+                    # Generate diverse full names
+                    diverse_names = []
+                    for _ in range(total_rows):
+                        name_type = random.choices([1, 2, 3], weights=[70, 15, 15], k=1)[0]
+                        
+                        if name_type == 1:  # 70% standard names
+                            name = fake_multi.name()
+                        elif name_type == 2:  # 15% names with middle initial
+                            first = fake_multi.first_name()
+                            middle = fake_multi.first_name()[0] + "."
+                            last = fake_multi.last_name()
+                            name = f"{first} {middle} {last}"
+                        else:  # 15% names with hyphenated components
+                            if random.random() < 0.5:
+                                first = f"{fake_multi.first_name()}-{fake_multi.first_name()}"
+                                last = fake_multi.last_name()
+                            else:
+                                first = fake_multi.first_name()
+                                last = f"{fake_multi.last_name()}-{fake_multi.last_name()}"
+                            name = f"{first} {last}"
+                        
+                        diverse_names.append(name)
+                    
+                    result_df[col] = diverse_names
+    
+    return result_df
+
+def generate_and_process(
     input_path: str = None, 
     schema_path: str = None,
     output_path: str = None,
     num_rows: int = 100,
-    model_type: str = 'gaussian',
-    validate: bool = True
+    model_type: str = 'gaussian'
 ) -> pd.DataFrame:
     """
-    Generate synthetic data and validate it using the data validator.
+    Generate synthetic data and apply field parsing.
     
     Args:
         input_path: Path to input CSV (optional)
@@ -55,7 +112,6 @@ def generate_and_validate(
         output_path: Path to save the output CSV
         num_rows: Number of rows to generate
         model_type: Model type for model-based generation
-        validate: Whether to validate and fix the generated data
         
     Returns:
         DataFrame with synthetic data
@@ -93,36 +149,13 @@ def generate_and_validate(
     else:
         raise ValueError("Either input_path or schema_path must be provided")
     
-    # Validate and fix data if requested
-    if validate:
-        print("Validating and fixing data...")
-        corrected_df, corrections = validate_and_fix_data(synthetic_df, schema)
-        
-        # Print validation results
-        print(f"\n=== Validation Results ===")
-        print(f"Total corrections: {len(corrections)}")
-        
-        # Group corrections by type
-        correction_types = {}
-        for correction in corrections:
-            if ' - ' in correction:
-                reason = correction.split(' - ')[-1].strip()
-                if reason not in correction_types:
-                    correction_types[reason] = 0
-                correction_types[reason] += 1
-        
-        # Print corrections by type
-        if correction_types:
-            print("\nCorrections by type:")
-            for reason, count in sorted(correction_types.items(), key=lambda x: x[1], reverse=True):
-                print(f"  {reason}: {count}")
-        
-        # Use the corrected data
-        synthetic_df = corrected_df
-    
     # Apply field parsing for special cases
     if FIELD_PARSER_AVAILABLE:
+        print("Applying field parsing rules...")
         synthetic_df = apply_field_parsing(synthetic_df)
+    
+    # Generate diverse names if applicable
+    synthetic_df = generate_diverse_names(synthetic_df)
     
     # Save to file if output path provided
     if output_path:
@@ -132,9 +165,9 @@ def generate_and_validate(
     return synthetic_df
 
 def main():
-    """Main function to parse arguments and run the generation+validation"""
+    """Main function to parse arguments and run the generator"""
     parser = argparse.ArgumentParser(
-        description="Generate and validate synthetic data"
+        description="Generate synthetic data"
     )
     
     parser.add_argument(
@@ -144,7 +177,7 @@ def main():
         "--schema", "-s", type=str, help="Schema JSON file"
     )
     parser.add_argument(
-        "--output", "-o", type=str, default="synthetic_data_validated.csv",
+        "--output", "-o", type=str, default="synthetic_data.csv",
         help="Output CSV file"
     )
     parser.add_argument(
@@ -156,10 +189,6 @@ def main():
         choices=["gaussian", "ctgan"],
         help="Model type for model-based generation"
     )
-    parser.add_argument(
-        "--no-validate", action="store_true",
-        help="Skip validation step"
-    )
     
     args = parser.parse_args()
     
@@ -167,22 +196,21 @@ def main():
     if not args.input and not args.schema:
         parser.error("Either --input or --schema must be provided")
     
-    # Generate and validate
+    # Generate synthetic data
     try:
-        synthetic_df = generate_and_validate(
+        synthetic_df = generate_and_process(
             input_path=args.input,
             schema_path=args.schema,
             output_path=args.output,
             num_rows=args.rows,
-            model_type=args.model,
-            validate=not args.no_validate
+            model_type=args.model
         )
         
         print(f"\nGenerated {len(synthetic_df)} rows of synthetic data")
         print(f"Data preview:")
         print(synthetic_df.head())
         
-        print(f"\nSynthetic data generation and validation completed successfully!")
+        print(f"\nSynthetic data generation completed successfully!")
     except Exception as e:
         print(f"Error: {str(e)}")
         import traceback

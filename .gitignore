@@ -37,14 +37,8 @@ env/
 
 # Generated data files
 synthetic_data_*.csv
-test_*.csv
-test_*.json
-final_*.csv
 *.csv
 !example_data/*.csv
-
-# Lock files
-.~lock.*
 
 # OS specific files
 .DS_Store

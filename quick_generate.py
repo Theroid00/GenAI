@@ -10,7 +10,7 @@ This script provides a simplified command-line interface for generating syntheti
 import os
 import sys
 import argparse
-from integrated_generator import generate_and_validate
+from synthetic_data_gen import SyntheticDataGenerator, load_schema_from_json
 
 def main():
     """Main function with simplified argument parsing"""
@@ -98,13 +98,23 @@ def main():
     
     # Run the generator
     try:
-        df = generate_and_validate(
-            input_path=input_path,
-            schema_path=schema_path,
-            output_path=args.output,
-            num_rows=args.rows,
-            validate=not args.no_validate
-        )
+        generator = SyntheticDataGenerator()
+        
+        if input_path:
+            df = generator.generate_from_csv(
+                csv_path=input_path,
+                num_rows=args.rows,
+                output_path=args.output,
+                validate=not args.no_validate
+            )
+        else:
+            schema = load_schema_from_json(schema_path)
+            df = generator.generate_from_schema(
+                schema=schema,
+                num_rows=args.rows,
+                output_path=args.output,
+                validate=not args.no_validate
+            )
         
         print(f"\nSuccessfully generated {len(df)} rows of synthetic data!")
         print(f"Output saved to: {os.path.abspath(args.output)}")

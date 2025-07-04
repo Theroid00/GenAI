@@ -12,12 +12,19 @@ import sys
 import argparse
 import textwrap
 import subprocess
+from pathlib import Path
+
+# Import version from the package
+try:
+    from synthetic_data_gen import __version__
+except ImportError:
+    __version__ = "Unknown"
 
 def display_intro():
     """Display an introduction to the Synthetic Data Generator"""
-    intro = """
+    intro = f"""
     ╔═══════════════════════════════════════════════════════════════════╗
-    ║                   SYNTHETIC DATA GENERATOR                        ║
+    ║                   SYNTHETIC DATA GENERATOR v{__version__:<8}               ║
     ╚═══════════════════════════════════════════════════════════════════╝
     
     A comprehensive tool for generating high-quality synthetic data
@@ -48,9 +55,12 @@ def display_options():
        - Learn from existing data
     
     6. Launch interactive mode
-       - Generate data from scratch (directly to interactive input)
+       - Generate data interactively
     
-    7. View documentation
+    7. Check dependencies
+       - Verify all required packages are installed
+    
+    8. View documentation
        - Open README.md in an editor
     
     0. Exit
@@ -93,9 +103,14 @@ def generate_from_template():
         template_name = template_files[choice-1]
         rows = input("Number of rows to generate [100]: ").strip() or "100"
         output = input(f"Output filename [{template_name}_data.csv]: ").strip() or f"{template_name}_data.csv"
+        visualize = input("Visualize data distributions? (y/n) [n]: ").strip().lower() or "n"
         
         print(f"\nGenerating data using template: {template_name}")
         command = f"python synthetic_data_cli.py --template {template_name} --rows {rows} --output {output}"
+        
+        if visualize.startswith('y'):
+            command += " --visualize"
+            
         run_command(command)
     except ValueError:
         print("Invalid input.")
@@ -110,32 +125,9 @@ def create_template():
             print("Template name is required.")
             return
         
-        print("\nTemplate types:")
-        print("  1. Interactive (create from scratch)")
-        print("  2. Customer example")
-        print("  3. Employee example")
-        print("  4. Sales example")
-        print("  5. Student example")
-        
-        choice = int(input("\nSelect a template type (number): "))
-        
-        if choice == 1:
-            command = f"python create_template.py --name {name}"
-        elif choice == 2:
-            command = f"python create_template.py --name {name} --example customer"
-        elif choice == 3:
-            command = f"python create_template.py --name {name} --example employee"
-        elif choice == 4:
-            command = f"python create_template.py --name {name} --example sales"
-        elif choice == 5:
-            command = f"python create_template.py --name {name} --example student"
-        else:
-            print("Invalid choice.")
-            return
-        
+        print(f"\nCreating template: {name}")
+        command = f"python synthetic_data_cli.py --create-template {name}"
         run_command(command)
-    except ValueError:
-        print("Invalid input.")
     except KeyboardInterrupt:
         print("\nOperation cancelled.")
 
@@ -165,9 +157,14 @@ def generate_from_schema():
         
         rows = input("Number of rows to generate [100]: ").strip() or "100"
         output = input("Output filename [schema_data.csv]: ").strip() or "schema_data.csv"
+        visualize = input("Visualize data distributions? (y/n) [n]: ").strip().lower() or "n"
         
         print(f"\nGenerating data from schema: {schema_file}")
         command = f"python synthetic_data_cli.py --schema {schema_file} --rows {rows} --output {output}"
+        
+        if visualize.startswith('y'):
+            command += " --visualize"
+            
         run_command(command)
     except KeyboardInterrupt:
         print("\nOperation cancelled.")
@@ -183,6 +180,7 @@ def generate_from_csv():
         rows = input("Number of rows to generate [100]: ").strip() or "100"
         output = input("Output filename [synthetic_data.csv]: ").strip() or "synthetic_data.csv"
         model = input("Model type (gaussian/ctgan) [gaussian]: ").strip().lower() or "gaussian"
+        visualize = input("Visualize data distributions? (y/n) [n]: ").strip().lower() or "n"
         
         if model not in ["gaussian", "ctgan"]:
             print("Invalid model type. Using 'gaussian'.")
@@ -190,14 +188,67 @@ def generate_from_csv():
         
         print(f"\nGenerating data from CSV: {csv_file}")
         command = f"python synthetic_data_cli.py --sample {csv_file} --rows {rows} --output {output} --model {model}"
+        
+        if visualize.startswith('y'):
+            command += " --visualize"
+            
         run_command(command)
     except KeyboardInterrupt:
         print("\nOperation cancelled.")
 
 def launch_interactive_mode():
     """Launch the interactive mode"""
+    interactive_path = Path(__file__).parent / "interactive_mode.py"
+    
+    if not interactive_path.exists():
+        print("Creating interactive mode script...")
+        with open(interactive_path, 'w') as f:
+            f.write("""#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+\"\"\"
+Interactive Mode for Synthetic Data Generator
+---------------------------------------------
+This script provides an interactive interface for generating synthetic data.
+\"\"\"
+
+import os
+import sys
+from pathlib import Path
+
+# Import from the synthetic_data_gen package
+from synthetic_data_gen import SyntheticDataGenerator
+
+def main():
+    \"\"\"Main function for interactive mode\"\"\"
+    print("\\nWelcome to Interactive Mode!")
+    print("This mode allows you to create a schema and generate data interactively.\\n")
+    
+    # Create generator instance
+    generator = SyntheticDataGenerator()
+    
+    try:
+        # Launch interactive mode
+        generator.interactive_mode()
+    except KeyboardInterrupt:
+        print("\\nInteractive mode cancelled.")
+    except Exception as e:
+        print(f"\\nError: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+if __name__ == "__main__":
+    main()
+""")
+    
     print("\nLaunching interactive mode...")
     command = "python interactive_mode.py"
+    run_command(command)
+
+def check_dependencies():
+    """Check all dependencies"""
+    print("\nChecking dependencies...")
+    command = "python synthetic_data_cli.py --check-deps"
     run_command(command)
 
 def view_documentation():
@@ -205,8 +256,10 @@ def view_documentation():
     readme_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "README.md")
     
     if not os.path.exists(readme_file):
-        print("README.md not found.")
-        return
+        readme_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "FINAL_README.md")
+        if not os.path.exists(readme_file):
+            print("README.md not found.")
+            return
     
     # Try to determine the best way to open the file
     if sys.platform.startswith('linux'):
@@ -241,7 +294,7 @@ def main():
         display_options()
         
         try:
-            choice = input("\nEnter your choice (0-7): ").strip()
+            choice = input("\nEnter your choice (0-8): ").strip()
             
             if choice == '0':
                 print("\nExiting. Goodbye!")
@@ -259,9 +312,11 @@ def main():
             elif choice == '6':
                 launch_interactive_mode()
             elif choice == '7':
+                check_dependencies()
+            elif choice == '8':
                 view_documentation()
             else:
-                print("Invalid choice. Please enter a number between 0 and 7.")
+                print("Invalid choice. Please enter a number between 0 and 8.")
             
             # Pause before showing menu again
             input("\nPress Enter to continue...")

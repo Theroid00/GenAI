@@ -20,11 +20,8 @@ from field_standards import (
     format_phone_number
 )
 
-# Import from main script
-from synthetic_data_generator import (
-    generate_synthetic_data_from_schema,
-    post_process_synthetic_data
-)
+# Import from main package
+from synthetic_data_gen import SyntheticDataGenerator
 
 def test_id_generation():
     """Test generation of various ID types"""
@@ -227,11 +224,8 @@ def test_synthetic_data_generation():
     num_rows = 100
     print(f"Generating {num_rows} rows with {len(schema)} columns...")
     
-    synthetic_df = generate_synthetic_data_from_schema(schema, num_rows)
-    
-    # Apply post-processing
-    print("Applying post-processing to make data more realistic...")
-    processed_df = post_process_synthetic_data(pd.DataFrame(), synthetic_df)
+    generator = SyntheticDataGenerator()
+    processed_df = generator.generate_from_schema(schema, num_rows)
     
     # Display sample rows
     print("\nSample data (first 5 rows):")

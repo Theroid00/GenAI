@@ -14,15 +14,6 @@ from datetime import datetime, timedelta
 import uuid
 from faker import Faker
 
-# Import the field standards module
-from synthetic_data_gen.field_standards import (
-    detect_id_field_type, 
-    generate_id, 
-    format_email, 
-    format_phone_number,
-    get_weighted_email_domain
-)
-
 # Initialize faker for generating realistic data
 fake = Faker()
 
@@ -52,94 +43,8 @@ def post_process_synthetic_data(original_df: pd.DataFrame, synthetic_df: pd.Data
     """
     result_df = synthetic_df.copy()
     
-    # Pre-process name columns immediately to ensure uniqueness
+    # Identify columns that might need processing
     for col in synthetic_df.columns:
-        col_lower = col.lower()
-        if any(name_term in col_lower for name_term in ['name', 'person', 'student', 'user']) and 'id' not in col_lower:
-            logger.info(f"Generating unique names for column: {col}")
-            
-            # Set a seed based on the column name for reproducibility but different across columns
-            col_seed = hash(col) % 10000
-            random.seed(col_seed)
-            
-            # Use multiple Faker instances with different locales to increase variety
-            all_names = []
-            locales = ['en_US', 'en_GB', 'en_CA', 'en_AU']
-            
-            # Generate more names than needed to ensure uniqueness after deduplication
-            needed_names = len(synthetic_df)
-            target_count = needed_names * 3  # Generate 3x as many as needed
-            
-            # Generate names using different patterns
-            for i in range(target_count):
-                locale = random.choice(locales)
-                temp_faker = Faker(locale)
-                
-                # Add variety with different name patterns
-                if i % 3 == 0:
-                    # Standard full name
-                    name = temp_faker.name()
-                elif i % 3 == 1:
-                    # Name with middle initial
-                    first = temp_faker.first_name()
-                    middle = temp_faker.first_name()[0] + "."
-                    last = temp_faker.last_name()
-                    name = f"{first} {middle} {last}"
-                else:
-                    # Double first or last name
-                    if random.choice([True, False]):
-                        first = f"{temp_faker.first_name()}-{temp_faker.first_name()}"
-                        last = temp_faker.last_name()
-                    else:
-                        first = temp_faker.first_name()
-                        last = f"{temp_faker.last_name()}-{temp_faker.last_name()}"
-                    name = f"{first} {last}"
-                
-                all_names.append(name)
-            
-            # Ensure uniqueness by removing duplicates while preserving order
-            unique_names = list(dict.fromkeys(all_names))
-            
-            # If we don't have enough unique names, generate more with even more variation
-            while len(unique_names) < needed_names:
-                # Generate very specific names with multiple components
-                temp_faker = Faker()
-                first = temp_faker.first_name()
-                middle1 = temp_faker.first_name()[0] + "."
-                middle2 = temp_faker.first_name()[0] + "."
-                last = temp_faker.last_name()
-                name = f"{first} {middle1} {middle2} {last}"
-                unique_names.append(name)
-            
-            # Use only as many names as we need
-            final_names = unique_names[:needed_names]
-            # Shuffle once more for good measure
-            random.shuffle(final_names)
-            
-            # Assign unique names to the dataframe
-            result_df[col] = final_names
-    
-    # Continue with regular processing for other columns
-    for col in synthetic_df.columns:
-        # Skip name columns as we've already processed them
-        col_lower = col.lower()
-        if any(name_term in col_lower for name_term in ['name', 'person', 'student', 'user']) and 'id' not in col_lower:
-            continue
-            
-        # Special handling for ID columns with UUIDs or placeholders
-        id_type = detect_id_field_type(col)
-        if id_type and synthetic_df[col].dtype == 'object':
-            # Check if this appears to be a UUID format or placeholder
-            sample_values = synthetic_df[col].head(5).astype(str)
-            has_uuids = any('-' in str(val) and len(str(val)) > 30 for val in sample_values)
-            has_placeholders = any('placeholder' in str(val) or 'sdv-id' in str(val) for val in sample_values)
-            
-            if has_uuids or has_placeholders:
-                logger.info(f"Converting to proper {id_type} IDs for column: {col}")
-                # Generate proper IDs based on detected type
-                result_df[col] = [generate_id(id_type, i) for i in range(len(synthetic_df))]
-                continue
-            
         # Check if the column contains auto-generated IDs (SDV often creates "sdv-id-*" values)
         if synthetic_df[col].dtype == 'object':  # String columns
             # Check first few values to see if they match the SDV ID pattern
@@ -181,6 +86,11 @@ def post_process_synthetic_data(original_df: pd.DataFrame, synthetic_df: pd.Data
                         # Default ID generation
                         logger.info(f"Generating generic ID pattern for column: {col}")
                         result_df[col] = [f"ID-{i+1:04d}" for i in range(len(synthetic_df))]
+                        
+                elif any(name_term in col_lower for name_term in ['name', 'person', 'student', 'user']) and 'id' not in col_lower:
+                    logger.info(f"Replacing synthetic IDs with realistic names for column: {col}")
+                    # Generate realistic names
+                    result_df[col] = [fake.name() for _ in range(len(synthetic_df))]
                 elif 'city' in col_lower:
                     result_df[col] = [fake.city() for _ in range(len(synthetic_df))]
                 elif 'address' in col_lower:
@@ -188,56 +98,9 @@ def post_process_synthetic_data(original_df: pd.DataFrame, synthetic_df: pd.Data
                 elif 'company' in col_lower or 'school' in col_lower:
                     result_df[col] = [fake.company() for _ in range(len(synthetic_df))]
                 elif 'email' in col_lower:
-                    # Check if this is a placeholder or auto-generated email
-                    sample_values = synthetic_df[col].head(5).astype(str)
-                    needs_generation = any('placeholder' in str(val) or 'sdv-id' in str(val) for val in sample_values)
-                    
-                    if needs_generation or 'email' in col_lower:
-                        # Create realistic emails that match names if available
-                        name_columns = [c for c in result_df.columns if any(term in c.lower() for term in 
-                                      ['name', 'firstname', 'first_name', 'lastname', 'last_name', 'fullname'])]
-                        
-                        if name_columns and not all(result_df[name_columns[0]].isnull()):
-                            # Use the first available name column to generate matching emails
-                            name_col = name_columns[0]
-                            logger.info(f"Generating emails based on name column: {name_col}")
-                            
-                            emails = []
-                            for idx, row in result_df.iterrows():
-                                name = str(row[name_col])
-                                
-                                # Extract first and last name
-                                parts = name.split()
-                                if len(parts) >= 2:
-                                    first = parts[0]
-                                    last = parts[-1]
-                                    
-                                    # Use our standardized email formatter
-                                    email = format_email(first, last)
-                                    emails.append(email)
-                                else:
-                                    # Fallback if we can't parse the name properly
-                                    domain = get_weighted_email_domain()
-                                    emails.append(f"{name.lower().replace(' ', '')}@{domain}")
-                            
-                            result_df[col] = emails
-                        else:
-                            # Fallback to more realistic emails if no name column is available
-                            emails = []
-                            for _ in range(len(synthetic_df)):
-                                username = fake.user_name()
-                                domain = get_weighted_email_domain()
-                                
-                                # Maybe add random number for uniqueness
-                                if random.random() < 0.3:
-                                    username = f"{username}{random.randint(1, 999)}"
-                                    
-                                emails.append(f"{username}@{domain}")
-                                
-                            result_df[col] = emails
+                    result_df[col] = [fake.email() for _ in range(len(synthetic_df))]
                 elif 'phone' in col_lower:
-                    # Generate properly formatted phone numbers using our standardized formatter
-                    result_df[col] = [format_phone_number() for _ in range(len(synthetic_df))]
+                    result_df[col] = [fake.phone_number() for _ in range(len(synthetic_df))]
                 elif 'job' in col_lower or 'occupation' in col_lower:
                     result_df[col] = [fake.job() for _ in range(len(synthetic_df))]
                 elif 'country' in col_lower:
@@ -430,9 +293,7 @@ def generate_synthetic_data_from_schema(schema: List[Dict[str, Any]], num_rows: 
                 elif subtype == 'country':
                     data[col_name] = [fake.country() for _ in range(num_rows)]
                 elif subtype == 'email':
-                    # Don't generate emails here, we'll handle them in post-processing
-                    # This placeholder will be replaced with proper emails that match names
-                    data[col_name] = [f"placeholder-email-{i}" for i in range(num_rows)]
+                    data[col_name] = [fake.email() for _ in range(num_rows)]
                 elif subtype == 'phone':
                     data[col_name] = [fake.phone_number() for _ in range(num_rows)]
                 elif subtype == 'address':
@@ -492,25 +353,16 @@ def generate_synthetic_data_from_schema(schema: List[Dict[str, Any]], num_rows: 
                 data[col_name] = dates
             
         elif col_type == 'uuid':
-            # Check if the column appears to be an ID field
-            id_type = detect_id_field_type(col_name)
-            
-            if id_type:
-                # Generate IDs with proper patterns based on the detected type
-                logger.info(f"Generating {id_type} IDs for column: {col_name}")
-                data[col_name] = [generate_id(id_type, i) for i in range(num_rows)]
+            # For large datasets, generate UUIDs in batches to improve performance
+            if num_rows > 50000:
+                uuids = []
+                for i in range(0, num_rows, batch_size):
+                    current_batch = min(batch_size, num_rows - i)
+                    batch_uuids = [str(uuid.uuid4()) for _ in range(current_batch)]
+                    uuids.extend(batch_uuids)
+                data[col_name] = uuids
             else:
-                # Generate regular UUIDs for non-ID columns
-                # For large datasets, generate UUIDs in batches to improve performance
-                if num_rows > 50000:
-                    uuids = []
-                    for i in range(0, num_rows, batch_size):
-                        current_batch = min(batch_size, num_rows - i)
-                        batch_uuids = [str(uuid.uuid4()) for _ in range(current_batch)]
-                        uuids.extend(batch_uuids)
-                    data[col_name] = uuids
-                else:
-                    data[col_name] = [str(uuid.uuid4()) for _ in range(num_rows)]
+                data[col_name] = [str(uuid.uuid4()) for _ in range(num_rows)]
     
     # Create DataFrame
     df = pd.DataFrame(data)
